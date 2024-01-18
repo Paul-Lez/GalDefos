@@ -4,9 +4,35 @@ universe u v w w'
 
 open  LocalRing RingHom Ideal Submodule RingHom TensorProduct
 
+section API
+
+open LinearMap
+
+variable (R : Type*) {R₁ : Type*} {R₂ : Type*} {R₃ : Type*} {k : Type*} {S : Type*} {S₃ : Type*} {T : Type*} {M : Type*}
+  {M₁ : Type*} {M₂ : Type*} {M₃ : Type*} {N₁ : Type*} {N₂ : Type*} {N₃ : Type*} {ι : Type*} [Semiring R] [Semiring S]
+  [AddCommMonoid M] [AddCommMonoid M₁] [AddCommMonoid M₂] [AddCommMonoid M₃] [AddCommMonoid N₁] [AddCommMonoid N₂]
+  [AddCommMonoid N₃] [Module R M] [Module R M₂] [Module R M₃] [Module S M₃] {σ : R →+* S} [Module S M] [Module S M₂] (fₗ : M →ₗ[S] M₂) (gₗ : M₂ →ₗ[S] M₃)
+  [LinearMap.CompatibleSMul M M₂ R S]
+  [LinearMap.CompatibleSMul M₂ M₃ R S]
+  [LinearMap.CompatibleSMul M M₃ R S]
+
+
+@[simp]
+lemma LinearMap.restrictScalars_id [LinearMap.CompatibleSMul M M R S] :
+  restrictScalars R (LinearMap.id : M →ₗ[S] M) = LinearMap.id := rfl
+
+@[simp]
+lemma LinearMap.restrictScalars_comp : restrictScalars R (gₗ.comp fₗ) = (restrictScalars R gₗ).comp
+  (restrictScalars R fₗ) := rfl
+
+end API
+
+
 section
 
 open CategoryTheory
+
+
 
 variable (R : Type w) [CommRing R] (k : Type w') [Field k] (π : R → k) [Algebra R k]
 
@@ -15,19 +41,46 @@ section deformation
 variable  {G M A : Type*} [Group G] [AddCommGroup M] [CommRing A] [Algebra R A] [Module A M] [Module.Free A M] [Module R M] [IsScalarTower R A M] {V : Type*} [AddCommGroup V] [Module k V]
   (φ : V ≃ₗ[k] k ⊗[R] M)
 
-def fiber (φ : V ≃ₗ[k] k ⊗[R] M) (ρ : Representation A G M) :
-  Representation k G V where
+instance : IsScalarTower R k (k ⊗[R] M) := by
+  infer_instance
+
+instance : LinearMap.CompatibleSMul (k ⊗[R] M) (k ⊗[R] M) k R := by
+  constructor
+  intro f c x
+  let motive : k ⊗[R] M → Prop := fun x => ∀ (c : k), f (c • x) = c • f x
+  suffices motive x by exact this c
+  apply TensorProduct.induction_on
+  simp only [smul_zero, _root_.map_zero, forall_const]
+  intro x y c
+  sorry
+  intro x y hx hy c
+  simp only [smul_add, map_add, hx c, hy c]
+
+noncomputable def fiber (φ : V ≃ₗ[k] k ⊗[R] M) (ρ : Representation A G M) : Representation k G V where
     toFun := fun g => by
       let ψ : (k ⊗[R] M) →ₗ[R] (k ⊗[R] M) :=
         TensorProduct.map ((LinearMap.id : k →ₗ[R] k)) (ρ g : M →ₗ[R] M)
-      haveI : LinearMap.CompatibleSMul (k ⊗[R] M) (k ⊗[R] M) k R := sorry
       let ψ' : (k ⊗[R] M) →ₗ[k] (k ⊗[R] M) := LinearMap.restrictScalars k ψ
-      let μ : V →ₗ[k] (k ⊗[R] M) := (ψ'.comp (k := )φ.toFun)
-      --exact φ.invFun.comp (ψ'.comp φ.toFun)
-    map_one' := sorry
-    map_mul' := sorry
-
-
+      exact φ.symm.toLinearMap.comp (ψ'.comp φ.toLinearMap)
+    map_one' := by
+      ext x
+      simp only [_root_.map_one]
+      simp only [LinearMap.coe_comp, LinearEquiv.coe_coe, LinearMap.coe_restrictScalars,
+        Function.comp_apply, LinearMap.one_apply]
+      have : (1 : M →ₗ[A] M) = LinearMap.id := rfl
+      rw [this]
+      aesop
+    map_mul' := by
+      intro x y
+      simp only [_root_.map_mul]
+      rw [LinearMap.mul_eq_comp, LinearMap.mul_eq_comp]
+      simp only [LinearMap.restrictScalars_comp]
+      ext t
+      simp only [LinearMap.coe_comp, LinearEquiv.coe_coe, LinearMap.coe_restrictScalars,
+        Function.comp_apply, LinearEquiv.apply_symm_apply, EmbeddingLike.apply_eq_iff_eq]
+      conv_lhs => rw [show LinearMap.id = LinearMap.id.comp LinearMap.id from rfl]
+      rw [TensorProduct.map_comp]
+      simp only [LinearMap.coe_comp, Function.comp_apply]
 
 variable {R k} in
 def IsDeformation (ρ₀ : Representation k G V) (ρ : Representation A G M) (φ : V ≃ₗ[k] k ⊗[R] M):
@@ -44,7 +97,6 @@ def DeformationFunctor₀ (ρ₀ : Representation k G V) : Setoid (Deformation A
 variable {R k} (A) in
 def DeformationFunctor (ρ₀ : Representation k G V) :
   Quotient (DeformationFunctor₀ A φ ρ₀) := sorry
-
 
 
 end deformation
